@@ -40,7 +40,7 @@ async function main() {
     const contract = new ethers.Contract(address, abi, provider);
     
     // Upload image to IPFS
-    const buffer = await fs.readFileSync("./images/Wallpaper.png");
+    const buffer = await fs.readFileSync("./images/test.png");
     const image = new File([buffer], "image.png", { type: "image/png"});
     var cid = await uploadImage(image, "Test");
     console.log(cid);
