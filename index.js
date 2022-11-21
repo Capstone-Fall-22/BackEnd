@@ -6,7 +6,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 const nftstorage = new NFTStorage({ token: process.env.NFT_STORAGE_KEY });
 import test_input from "./test-model-input.json" assert { type: "json" };
-import { PNG } from 'pngjs';
+import Jimp from "jimp";
 
 async function postPrediction(prediction) {
     const output = await fetch("http://localhost:8501/v1/models/test-model:predict", {
@@ -31,37 +31,30 @@ async function uploadImage(image, tokenID, who = undefined) {
 }
 
 function convertImg(input, tokenID) {
-    let output = new PNG({ width: 1280, height: 720 });
-    for (let i = 0; i < 720; i++) {
-        for (let j = 0; j < 1280; j++) {
-	    let idx = (output.width * i + j) << 2;
-	    for (let k = 0; k < 3; k++) {
-		var pred = input.predictions[0][i][j][k];
-		pred++;
-		pred *= 127.5;
-		/*
-		pred *= 255;
-		pred = Math.abs(pred);
-		*/
-	        output.data[idx + k] = Math.round(pred);
-	    }
-	    output.data[idx + 3] = 0xff;
-	}
-    }
-    const img_path = `./images/${tokenID}.png`;
-    fs.stat(img_path, function() {
-	fs.unlinkSync(img_path);
+    new Jimp(1280, 720, (err, image) => {
+        for (let i = 0; i < 720; i++) {
+            for (let j = 0; j < 1280; j++) {
+                var pred = input.predictions[0][i][j];
+                for (let k = 0; k < 3; k++) {
+                    pred[k]++;
+                    pred[k] *= 127.5;
+                    pred[k] = Math.round(pred[k])
+                }
+                image.setPixelColor(Jimp.rgbaToInt(pred[0], pred[1], pred[2], 255), j, i);
+            }
+        }
+	image.write(`./images/${tokenID}.png`);
     });
-    output.pack().pipe(fs.createWriteStream(img_path));
 }
 
 async function uploadNewPrediction(tokenID) {
     var image_res = await postPrediction(test_input);
     convertImg(image_res, tokenID);
-    const buffer = await fs.readFileSync(`./images/${tokenID}.png`);
-    const image = new File([buffer], "image.png", { type: "image/png" });
-    var cid = await uploadImage(image, tokenID);
-    console.log(cid);
+    var output = fs.readFile(`./images/${tokenID}.png`, async (err, image) => {
+        var image = new File([output], "image.png", { type: "image/png" });
+        var cid = await uploadImage(image, tokenID);
+	console.log(cid);
+    });
 }
 
 async function main() {
