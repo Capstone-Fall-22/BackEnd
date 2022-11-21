@@ -72,13 +72,10 @@ async function main() {
     // Make a prediction and get an image from the output
     uploadNewPrediction("Test");
 
-    /* Listen for minting events
     contract.on("mint", (_tokenId, _who, event) => {
-        console.log(`Minted ${_tokenId} for ${_who}`);
-	var pred_img = convertImg(postPrediction(sample_pred));
-	var minted_img = uploadImage(pred_img, _tokenId);
+        uploadNewPrediction(_tokenId);
+	console.log(`Minted ${_tokenId} for ${_who}`);
     });
-    */
 }
 
 main();
