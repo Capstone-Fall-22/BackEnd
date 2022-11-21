@@ -5,9 +5,11 @@ import { NFTStorage, File } from "nft.storage";
 import * as dotenv from "dotenv";
 dotenv.config();
 const nftstorage = new NFTStorage({ token: process.env.NFT_STORAGE_KEY });
+import test_input from "./test-model-input.json" assert { type: "json" };
+import { PNG } from 'pngjs';
 
 async function postPrediction(prediction) {
-    const output = await fetch("http://localhost:8501/v1/models/toy-model:predict", {
+    const output = await fetch("http://localhost:8501/v1/models/test-model:predict", {
         method: "POST",
 	headers: {
 	    "Content-Type": "application/json"
@@ -28,10 +30,38 @@ async function uploadImage(image, tokenID, who = undefined) {
     });
 }
 
-function convertImg(input) {
-    for () {
-        
+function convertImg(input, tokenID) {
+    let output = new PNG({ width: 1280, height: 720 });
+    for (let i = 0; i < 720; i++) {
+        for (let j = 0; j < 1280; j++) {
+	    let idx = (output.width * i + j) << 2;
+	    for (let k = 0; k < 3; k++) {
+		var pred = input.predictions[0][i][j][k];
+		pred++;
+		pred *= 127.5;
+		/*
+		pred *= 255;
+		pred = Math.abs(pred);
+		*/
+	        output.data[idx + k] = Math.round(pred);
+	    }
+	    output.data[idx + 3] = 0xff;
+	}
     }
+    const img_path = `./images/${tokenID}.png`;
+    fs.stat(img_path, function() {
+	fs.unlinkSync(img_path);
+    });
+    output.pack().pipe(fs.createWriteStream(img_path));
+}
+
+async function uploadNewPrediction(tokenID) {
+    var image_res = await postPrediction(test_input);
+    convertImg(image_res, tokenID);
+    const buffer = fs.readFileSync(`./images/${tokenID}.png`);
+    const image = new File([buffer], "image.png", { type: "image/png" });
+    var cid = await uploadImage(image, tokenID);
+    console.log(cid);
 }
 
 async function main() {
@@ -39,24 +69,16 @@ async function main() {
     const provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_KEY);
     const contract = new ethers.Contract(address, abi, provider);
     
-    // Upload image to IPFS
-    const buffer = await fs.readFileSync("./images/Wallpaper.png");
-    const image = new File([buffer], "image.png", { type: "image/png"});
-    var cid = await uploadImage(image, "Test");
-    console.log(cid);
-
     // Make a prediction and get an image from the output
-    var image_res = postPrediction({ instances: [[0.12, 0.75, 0.92, 0.37]] })
-        .then((response) => {
-	    console.log(JSON.stringify(response));
-	});
+    uploadNewPrediction("Test");
 
-    // Listen for minting events
+    /* Listen for minting events
     contract.on("mint", (_tokenId, _who, event) => {
         console.log(`Minted ${_tokenId} for ${_who}`);
 	var pred_img = convertImg(postPrediction(sample_pred));
 	var minted_img = uploadImage(pred_img, _tokenId);
-    })
+    });
+    */
 }
 
 main();
