@@ -58,7 +58,7 @@ function convertImg(input, tokenID) {
 async function uploadNewPrediction(tokenID) {
     var image_res = await postPrediction(test_input);
     convertImg(image_res, tokenID);
-    const buffer = fs.readFileSync(`./images/${tokenID}.png`);
+    const buffer = await fs.readFileSync(`./images/${tokenID}.png`);
     const image = new File([buffer], "image.png", { type: "image/png" });
     var cid = await uploadImage(image, tokenID);
     console.log(cid);
@@ -69,15 +69,6 @@ async function main() {
     const provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_KEY);
     const contract = new ethers.Contract(address, abi, provider);
     
-<<<<<<< HEAD
-=======
-    // Upload image to IPFS
-    const buffer = await fs.readFileSync("./images/test.png");
-    const image = new File([buffer], "image.png", { type: "image/png"});
-    var cid = await uploadImage(image, "Test");
-    console.log(cid);
-
->>>>>>> 24deb44e558f5f8c5b4c7775754f9270a608b92c
     // Make a prediction and get an image from the output
     uploadNewPrediction("Test");
 
