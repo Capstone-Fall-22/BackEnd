@@ -107,11 +107,6 @@ async function main() {
     const provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_KEY);
     const contract = new ethers.Contract(address, abi, provider);
     
-    // Make a prediction and get an image from the output
-    uploadNewPrediction("Test");
-
-
-    
     contract.on("mint", (_tokenId, _who, event) => {
         uploadNewPrediction(_tokenId);
 	console.log(`Minted ${_tokenId} for ${_who}`);
