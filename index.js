@@ -136,10 +136,10 @@ async function main() {
     const provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_KEY);
     const contract = new ethers.Contract(address, abi, provider);
     
-    const tokenID = 0;
+    // const tokenID = 0;
     // await uploadNewPrediction(tokenID);
-    const link = await burnNFT(tokenID, "Me");
-    console.log(link);
+    // const link = await burnNFT(tokenID, "Me");
+    // console.log(link);
 
     contract.on("mint", (_tokenId, _who, _burnToken) => {
         mintToken(_tokenId, _who, _burnToken);
