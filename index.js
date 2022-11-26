@@ -127,7 +127,7 @@ async function mintToken(tokenID, who, burnToken) {
             const image = await fetch(`https://ipfs.io/ipfs/${metadata.image.slice(7)}`);
             const img_blob = await image.blob();
             const img_arr_buff = await img_blob.arrayBuffer();
-            const url = await uploadImage(Buffer.from(img_arr_buff), metadata.name.slice(8), who);
+            const url = await uploadImage(Buffer.from(img_arr_buff), tokenID, who);
             console.log(`Minted ${tokenID} for ${who} at ${url}`);
 	}
     } else if (_burnToken === 0) {
