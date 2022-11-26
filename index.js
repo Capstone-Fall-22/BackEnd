@@ -72,7 +72,6 @@ async function burnNFT(tokenID, who) {
     }
     metadata.properties.burned = true;
     metadata.properties.burner = who;
-    // await storage.bucket(bucketName).file(`${tokenID}.json`).delete();
     const image = await fetch(`https://ipfs.io/ipfs/${metadata.image.slice(7)}`);
     const img_blob = await image.blob();
     const img_arr_buff = await img_blob.arrayBuffer();
