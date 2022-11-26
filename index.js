@@ -35,7 +35,7 @@ async function postPrediction(prediction) {
 }
 
 async function uploadImage(img_buffer, tokenID, who = undefined) {
-    const image_link = await nftstorage.storeBlob(new Blob([img_buffer]));
+    var image_link = Buffer.isBuffer(img_buffer) ? await nftstorage.storeBlob(new Blob([img_buffer])) : img_buffer;
     const metadata = {
         name: `SCAiPES#${tokenID}`,
         description: "SCAiPES Description!",
@@ -52,7 +52,7 @@ async function uploadImage(img_buffer, tokenID, who = undefined) {
         destination: `${tokenID}.json`
     });
     fs.unlinkSync(metadata_file);
-    return `http://storage.googleapis.com/${bucketName}/${tokenID}.json`
+    return `https://storage.googleapis.com/${bucketName}/${tokenID}.json`
 }
 
 async function getMetadata(tokenID) {
@@ -70,12 +70,9 @@ async function burnNFT(tokenID, who) {
     } else if (metadata.properties.burned === true) {
         throw new Error("NFT already burned");
     }
-    metadata.properties.burned = true;
-    metadata.properties.burner = who;
-    const image = await fetch(`https://ipfs.io/ipfs/${metadata.image.slice(7)}`);
-    const img_blob = await image.blob();
-    const img_arr_buff = await img_blob.arrayBuffer();
-    return await uploadImage(Buffer.from(img_arr_buff), tokenID, who);
+    const burned_img = await uploadImage(metadata.image.slice(7), tokenID, who);
+    console.log(`${who} burned ${tokenID}`)
+    return burned_img;
 }
 
 async function convertImg(input, tokenID) {
@@ -118,15 +115,12 @@ async function mintToken(tokenID, who, burnToken) {
 	// download metadata for burnToken,
         // check if burned != true, generate new image
         // if burned == true, upload new md with existing image from burnToken
-        const metadata = await getMetadata(tokenID);
+        var metadata = await getMetadata(burnToken);
 	if (metadata.properties.burned !== true) {
             const url = await uploadNewPrediction(tokenID);
 	    console.log(`Minted ${tokenID} for ${who} at ${url}`);
 	} else {
-            const image = await fetch(`https://ipfs.io/ipfs/${metadata.image.slice(7)}`);
-            const img_blob = await image.blob();
-            const img_arr_buff = await img_blob.arrayBuffer();
-            const url = await uploadImage(Buffer.from(img_arr_buff), tokenID, who);
+	    const url = await uploadImage(metadata.image.slice(7), tokenID);
             console.log(`Minted ${tokenID} for ${who} at ${url}`);
 	}
     } else if (_burnToken === 0) {
@@ -142,10 +136,10 @@ async function main() {
     const provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_KEY);
     const contract = new ethers.Contract(address, abi, provider);
     
-    // await uploadNewPrediction(1);
-    // await uploadNewPrediction(2);
-    // const link = await burnNFT(1, "Me");
-    // console.log(link);
+    const tokenID = 0;
+    // await uploadNewPrediction(tokenID);
+    const link = await burnNFT(tokenID, "Me");
+    console.log(link);
 
     contract.on("mint", (_tokenId, _who, _burnToken) => {
         mintToken(_tokenId, _who, _burnToken);
