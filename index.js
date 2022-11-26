@@ -72,7 +72,7 @@ async function burnNFT(tokenID, who) {
     }
     metadata.properties.burned = true;
     metadata.properties.burner = who;
-    await storage.bucket(bucketName).file(`${tokenID}.json`).delete();
+    // await storage.bucket(bucketName).file(`${tokenID}.json`).delete();
     const image = await fetch(`https://ipfs.io/ipfs/${metadata.image.slice(7)}`);
     const img_blob = await image.blob();
     const img_arr_buff = await img_blob.arrayBuffer();
@@ -145,7 +145,7 @@ async function main() {
     
     // await uploadNewPrediction(1);
     // await uploadNewPrediction(2);
-    // const link = await burnNFT(2, "Me");
+    // const link = await burnNFT(1, "Me");
     // console.log(link);
 
     contract.on("mint", (_tokenId, _who, _burnToken) => {
