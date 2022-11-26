@@ -3,6 +3,7 @@
 
 # Keys
 .env
+gcs/*
 
-# Images
-/images
+# Temp
+/temp

@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import fs from "fs";
+import gcs from "@google-cloud/storage";
 import { NFTStorage, File } from "nft.storage";
 import * as dotenv from "dotenv";
 import Jimp from "jimp";
@@ -8,6 +9,8 @@ dotenv.config();
 import abi from "./abi/abi.json" assert { type: "json" };
 import test_input from "./test-model-input.json" assert { type: "json" };
 const nftstorage = new NFTStorage({ token: process.env.NFT_STORAGE_KEY });
+const storage = new gcs.Storage({ keyFilename: process.env.GOOGLE_CLOUD_STORAGE_KEY });
+const bucketName = "scaipes-metadata";
 
 function newPrediction() {
     var val = [];
@@ -32,43 +35,52 @@ async function postPrediction(prediction) {
 }
 
 async function uploadImage(img_buffer, tokenID, who = undefined) {
-    return await nftstorage.store({
-	name: `SCAiPES#${tokenID}`,
-	description: "Description!",
-	image: new File([img_buffer], `${tokenID}`, { type: "image/png" }),
-	website: "https://google.com/",
-	properties: {
-	    burned: typeof who !== "undefined",
-	    burner: who
-	}
+    const image_link = await nftstorage.storeBlob(new Blob([img_buffer]));
+    const metadata = {
+        name: `SCAiPES#${tokenID}`,
+        description: "SCAiPES Description!",
+        image: `ipfs://${image_link}`,
+        website: "https://google.com/",
+        properties: {
+            burned: typeof who !== "undefined",
+            burner: who
+        }
+    }
+    const metadata_file = `temp/${tokenID}.json`
+    await fs.writeFileSync(metadata_file, JSON.stringify(metadata));
+    await storage.bucket(bucketName).upload(metadata_file, {
+        destination: `${tokenID}.json`
     });
+    fs.unlinkSync(metadata_file);
+    return `http://storage.googleapis.com/${bucketName}/${tokenID}.json`
 }
 
-async function getMetadata(cid) {
-    const options = {
-        method: 'GET',
-        headers: { 'content-type': 'application/json' }
-    }
-    const metadata = await fetch(`https://ipfs.io/ipfs/${cid}/metadata.json`, options);
+async function getMetadata(tokenID) {
+    const metadata = await fetch(`http://storage.googleapis.com/${bucketName}/${tokenID}.json`, {
+        method: "GET",
+        headers: { "content-type": "application/json" }
+    });
     return await metadata.json();
 }
 
-async function burnNFT(cid, who) {
-    var metadata = await getMetadata(cid);
-    if (metadata.property === true) {
-       throw new Error("NFT already burned");
+async function burnNFT(tokenID, who) {
+    var metadata = await getMetadata(tokenID);
+    if (metadata.name !== `SCAiPES#${tokenID}`) {
+	throw new Error("Metadata doesn't exist");
+    } else if (metadata.properties.burned === true) {
+        throw new Error("NFT already burned");
     }
     metadata.properties.burned = true;
     metadata.properties.burner = who;
-    await nftstorage.delete(cid);
+    await storage.bucket(bucketName).file(`${tokenID}.json`).delete();
     const image = await fetch(`https://ipfs.io/ipfs/${metadata.image.slice(7)}`);
     const img_blob = await image.blob();
     const img_arr_buff = await img_blob.arrayBuffer();
-    return await uploadImage(Buffer.from(img_arr_buff), metadata.name.slice(8), who);
+    return await uploadImage(Buffer.from(img_arr_buff), tokenID, who);
 }
 
 async function convertImg(input, tokenID) {
-    const path = `./images/${tokenID}.png`;
+    const path = `./temp/${tokenID}.png`;
     const height = input.predictions[0].length;
     const width = input.predictions[0][0].length;
     for (let i = 1; i < height; i++) {
@@ -94,22 +106,56 @@ async function convertImg(input, tokenID) {
 
 async function uploadNewPrediction(tokenID) {
     const response = await postPrediction(newPrediction());
-    console.log(response);
     const file = await convertImg(response, tokenID);
     const image = await fs.readFileSync(file);
     fs.unlinkSync(file);
-    const cid = await uploadImage(image, tokenID);
-    console.log(cid.ipnft);
+    const url = await uploadImage(image, tokenID);
+    console.log(`Minted ${tokenID} at ${url}`);
+    return url;
+}
+
+async function mintToken(tokenID, who, burnToken) {
+    if (burnToken > 0) {
+	// download metadata for burnToken,
+        // check if burned != true, generate new image
+        // if burned == true, upload new md with existing image from burnToken
+        const metadata = await getMetadata(tokenID);
+	if (metadata.properties.burned !== true) {
+            const url = await uploadNewPrediction(tokenID);
+	    console.log(`Minted ${tokenID} for ${who} at ${url}`);
+	} else {
+            const image = await fetch(`https://ipfs.io/ipfs/${metadata.image.slice(7)}`);
+            const img_blob = await image.blob();
+            const img_arr_buff = await img_blob.arrayBuffer();
+            const url = await uploadImage(Buffer.from(img_arr_buff), metadata.name.slice(8), who);
+            console.log(`Minted ${tokenID} for ${who} at ${url}`);
+	}
+    } else if (_burnToken === 0) {
+        const url = await uploadNewPrediction(tokenID);
+        console.log(`Minted ${tokenID} for ${who} at ${url}`);
+    } else {
+        console.error("burnToken is negative!");
+    } // error negative
 }
 
 async function main() {
-    const address = "0x47AE92283cd7066a11f91D11d33c92A6A77e5bdF";
+    const address = "0xc356d2c9C68Be126e848739Ec2260D8eCF814184";
     const provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_KEY);
     const contract = new ethers.Contract(address, abi, provider);
     
-    contract.on("mint", (_tokenId, _who, event) => {
-        uploadNewPrediction(_tokenId);
-	console.log(`Minted ${_tokenId} for ${_who}`);
+    // await uploadNewPrediction(1);
+    // await uploadNewPrediction(2);
+    // const link = await burnNFT(2, "Me");
+    // console.log(link);
+
+    contract.on("mint", (_tokenId, _who, _burnToken) => {
+        mintToken(_tokenId, _who, _burnToken);
+    });
+    contract.on("burn", (_tokenId, _who) => {
+        // download metadata of burned token
+	// check if metadata exists for _tokenId
+	burnNFT(_tokenId, _who);
+	// reupload changed metadata
     });
 }
 
