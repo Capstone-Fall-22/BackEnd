@@ -1,154 +1,146 @@
+import * as dotenv from 'dotenv';
+dotenv.config()
+
 import { ethers } from "ethers";
-import fs from "fs";
-import gcs from "@google-cloud/storage";
-import { NFTStorage, File } from "nft.storage";
-import * as dotenv from "dotenv";
-import Jimp from "jimp";
+import { uploadImage } from './utils/ipfsUtils.js';
+import { getMetadata, uploadMetadata } from './utils/googleCloudUtils.js';
+import { getGeneratedImage } from './utils/modelUtils.js';
+import { writeImage, readImage, readABI } from './utils/fileUtils.js';
 
-dotenv.config();
-import abi from "./abi/abi.json" assert { type: "json" };
-import test_input from "./test-model-input.json" assert { type: "json" };
-const nftstorage = new NFTStorage({ token: process.env.NFT_STORAGE_KEY });
-const storage = new gcs.Storage({ keyFilename: process.env.GOOGLE_CLOUD_STORAGE_KEY });
-const bucketName = "scaipes-metadata";
+async function burnToken(tokenID, burner) {
+    let metadata = await getMetadata(tokenID);
 
-function newPrediction() {
-    var val = [];
-    val.push(new Array(100));
-    for (let i = 0; i < val[0].length; i++) {
-        val[0][i] = Math.random();
-    }
-    var prediction = {
-        instances: val
-    }
-    return prediction;
-}
-
-async function postPrediction(prediction) {
-    const options = {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(prediction)
-    }
-    const output = await fetch('http://localhost:8501/v1/models/test-model:predict', options);
-    return await output.json();
-}
-
-async function uploadImage(img_buffer, tokenID, who = undefined) {
-    var image_link = Buffer.isBuffer(img_buffer) ? await nftstorage.storeBlob(new Blob([img_buffer])) : img_buffer;
-    const metadata = {
-        name: `SCAiPES#${tokenID}`,
-        description: "SCAiPES Description!",
-        image: `ipfs://${image_link}`,
-        website: "https://google.com/",
-        properties: {
-            burned: typeof who !== "undefined",
-            burner: who
-        }
-    }
-    const metadata_file = `temp/${tokenID}.json`
-    await fs.writeFileSync(metadata_file, JSON.stringify(metadata));
-    await storage.bucket(bucketName).upload(metadata_file, {
-        destination: `${tokenID}.json`
-    });
-    fs.unlinkSync(metadata_file);
-    return `https://storage.googleapis.com/${bucketName}/${tokenID}.json`
-}
-
-async function getMetadata(tokenID) {
-    const metadata = await fetch(`http://storage.googleapis.com/${bucketName}/${tokenID}.json`, {
-        method: "GET",
-        headers: { "content-type": "application/json" }
-    });
-    return await metadata.json();
-}
-
-async function burnNFT(tokenID, who) {
-    var metadata = await getMetadata(tokenID);
-    if (metadata.name !== `SCAiPES#${tokenID}`) {
-	throw new Error("Metadata doesn't exist");
-    } else if (metadata.properties.burned === true) {
+    if (metadata.properties.burned === true) {
         throw new Error("NFT already burned");
     }
-    const burned_img = await uploadImage(metadata.image.slice(7), tokenID, who);
-    console.log(`${who} burned ${tokenID}`)
+
+    uploadMetadata(metadata.image, tokenID, burner);
+
+    console.log(`${burner} burned ${tokenID}`)
     return burned_img;
 }
 
-async function convertImg(input, tokenID) {
-    const path = `./temp/${tokenID}.png`;
-    const height = input.predictions[0].length;
-    const width = input.predictions[0][0].length;
-    for (let i = 1; i < height; i++) {
-        if (input.predictions[0][i].length !== width) {
-	    throw new Error("Invalid array width");
-	}
+async function mintBurnedToken(tokenId, minter, burnedTokenToCopy) {
+    let metadata;
+    try{
+        metadata = await getMetadata(burnedTokenToCopy);
+    }catch(e){
+        // Metadata of burnedTokenToCopy could not be found
+        console.error(e);
+        throw new Error(`Metadata could not be found for burned token #${burnedTokenToCopy} when creating new token #${tokenId}`);
     }
-    var image = new Jimp(width, height);
-    for (let i = 0; i < height; i++) {
-        for (let j = 0; j < width; j++) {
-            var pred = input.predictions[0][i][j];
-            for (let k = 0; k < 3; k++) {
-                pred[k]++;
-                pred[k] *= 127.5;
-                pred[k] = Math.round(pred[k]);
-            }
-            image.setPixelColor(Jimp.rgbaToInt(pred[0], pred[1], pred[2], 255), j, i);
+
+    if(metadata && metadata.properties.burned){
+        try{
+            // Make new metadata with same image link but new tokenId
+            const metadataUrl = uploadMetadata(metadata.image, tokenId);
+            console.log(`Burned Token Minted ${tokenId} for ${minter} at ${url} by copying ${burnedTokenToCopy} at ${metadataUrl}`);
+        }catch(e){
+            // Failed to upload metadata
+            console.error(e);
+            throw new Error(`Failed to upload new metadata for tokenid #${tokenId}`);
         }
     }
-    await image.writeAsync(path);
-    return path;
 }
 
-async function uploadNewPrediction(tokenID) {
-    const response = await postPrediction(newPrediction());
-    const file = await convertImg(response, tokenID);
-    const image = await fs.readFileSync(file);
-    fs.unlinkSync(file);
-    const url = await uploadImage(image, tokenID);
-    console.log(`Minted ${tokenID} at ${url}`);
-    return url;
+async function mintNewToken(tokenId){
+    let generatedImage, imagePath, imageBuffer, imageUrl, metadataUrl;
+
+    try{
+        generatedImage = await getGeneratedImage();
+    }catch(e){
+        console.error(e);
+        throw new Error(`Error getting generated image for tokenid #${tokenId}`);
+    }
+
+    try{
+        imagePath = await writeImage(generatedImage, tokenId);
+    }catch(e){
+        console.error(e);
+        throw new Error(`Error writing image for tokenid #${tokenId}`);
+    }
+
+    try{
+        imageBuffer = await readImage(imagePath);
+    }catch(e){
+        console.error(e);
+        throw new Error(`Error reading image for tokenid #${tokenId}`);
+    }
+
+    try{
+        imageUrl = await uploadImage(image);
+    }catch(e){
+        console.error(e);
+        throw new Error(`Error uploading image for tokenid #${tokenId}`);
+    }
+
+    try{
+        metadataUrl = await uploadMetadata(imageUrl, tokenId);
+    }catch(e){
+        console.error(e);
+        throw new Error(`Error uploading metadata for tokenid #${tokenId}`);
+    }
+
+    console.log(`New Token Minted ${tokenId} at ${metadataUrl}`);
 }
 
-async function mintToken(tokenID, who, burnToken) {
-    if (burnToken > 0) {
-	// download metadata for burnToken,
-        // check if burned != true, generate new image
-        // if burned == true, upload new md with existing image from burnToken
-        var metadata = await getMetadata(burnToken);
-	if (metadata.properties.burned !== true) {
-            const url = await uploadNewPrediction(tokenID);
-	    console.log(`Minted ${tokenID} for ${who} at ${url}`);
-	} else {
-	    const url = await uploadImage(metadata.image.slice(7), tokenID);
-            console.log(`Minted ${tokenID} for ${who} at ${url}`);
-	}
-    } else if (_burnToken === 0) {
-        const url = await uploadNewPrediction(tokenID);
-        console.log(`Minted ${tokenID} for ${who} at ${url}`);
-    } else {
-        console.error("burnToken is negative!");
-    } // error negative
+async function mintToken(tokenId, minter, burnedTokenToCopy) {
+    const isCopying = burnedTokenToCopy > 0;
+    if (isCopying){
+        try{
+            // If the user is copying a token and the token's metdata indicates that it
+            // has been burned, then copy the burned token's images in the new metadata
+            await mintBurnedToken(tokenId, minter, burnedTokenToCopy);
+            return;
+        }catch(e){
+            console.error(e);
+        }
+    }else{
+        // get prediction from model
+        try{
+            await mintNewToken(tokenId, minter);
+        }catch(e){
+            console.error(e);
+        }
+
+    }
 }
 
 async function main() {
-    const address = "0xc356d2c9C68Be126e848739Ec2260D8eCF814184";
-    const provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_KEY);
-    const contract = new ethers.Contract(address, abi, provider);
+    let abi, provider, contract;
+    try{
+        abi = await readABI(`${process.env.CONTRACT_ADDRESS}.json`);
+    }catch(e){
+        console.error("Error reading ABI");
+    }
     
-    // const tokenID = 0;
-    // await uploadNewPrediction(tokenID);
-    // const link = await burnNFT(tokenID, "Me");
-    // console.log(link);
+    try{
+        provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_API_KEY);
+    }catch{
+        console.error("Alchemy provider failed to connect");
+    }
 
-    contract.on("mint", (_tokenId, _who, _burnToken) => {
-        mintToken(_tokenId, _who, _burnToken);
+    try{
+        contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, abi, provider);
+    }catch(e){
+        console.error("Error connecting to contract");
+    }
+
+
+    contract.on("mint", (tokenId, minter, burnedTokenToCopy) => {
+        try{
+            mintToken(tokenId, minter, burnedTokenToCopy);
+        }catch(e){
+            console.error(`Error while minting: ${e}`);
+        }
     });
-    contract.on("burn", (_tokenId, _who) => {
-        // download metadata of burned token
-	// check if metadata exists for _tokenId
-	burnNFT(_tokenId, _who);
-	// reupload changed metadata
+
+    contract.on("burn", (tokenId, burner) => {
+        try{
+            burnToken(tokenId, burner);
+        }catch(e){
+            console.error(`Error while burning: ${e}`);
+        }
     });
 }
 

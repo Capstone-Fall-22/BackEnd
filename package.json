@@ -16,8 +16,10 @@
     "express": "^4.18.2",
     "ipfs-core": "^0.17.0",
     "jimp": "^0.16.2",
+    "js-beautify": "^1.14.7",
     "nft.storage": "^7.0.0",
     "node-fetch": "^3.3.0",
+    "nodemon": "^2.0.20",
     "pngjs": "^6.0.0"
   },
   "type": "module"
