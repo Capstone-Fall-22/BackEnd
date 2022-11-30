@@ -10,14 +10,16 @@ import { writeImage, readImage, readABI } from './utils/fileUtils.js';
 async function burnToken(tokenID, burner) {
     let metadata = await getMetadata(tokenID);
 
+    console.log(metadata);
+
     if (metadata.properties.burned === true) {
         throw new Error("NFT already burned");
     }
 
     uploadMetadata(metadata.image, tokenID, burner);
 
-    console.log(`${burner} burned ${tokenID}`)
-    return burned_img;
+    console.log(`Address: ${burner} just burned token #${tokenID}`)
+    return metadata.image;
 }
 
 async function mintBurnedToken(tokenId, minter, burnedTokenToCopy) {
@@ -33,13 +35,16 @@ async function mintBurnedToken(tokenId, minter, burnedTokenToCopy) {
     if(metadata && metadata.properties.burned){
         try{
             // Make new metadata with same image link but new tokenId
-            const metadataUrl = uploadMetadata(metadata.image, tokenId);
-            console.log(`Burned Token Minted ${tokenId} for ${minter} at ${url} by copying ${burnedTokenToCopy} at ${metadataUrl}`);
+            const metadataUrl = await uploadMetadata(metadata.image, tokenId);
+            console.log(`Burned Token Minted #${tokenId} for ${minter} by copying ${burnedTokenToCopy} at ${metadataUrl}`);
         }catch(e){
             // Failed to upload metadata
             console.error(e);
             throw new Error(`Failed to upload new metadata for tokenid #${tokenId}`);
         }
+    }else{
+        // burnedTokenToCopy is not burned
+        throw new Error(`Token #${burnedTokenToCopy} is not burned or metadata doesn't exist`);
     }
 }
 
@@ -68,7 +73,7 @@ async function mintNewToken(tokenId){
     }
 
     try{
-        imageUrl = await uploadImage(image);
+        imageUrl = await uploadImage(imageBuffer);
     }catch(e){
         console.error(e);
         throw new Error(`Error uploading image for tokenid #${tokenId}`);
@@ -125,7 +130,6 @@ async function main() {
     }catch(e){
         console.error("Error connecting to contract");
     }
-
 
     contract.on("mint", (tokenId, minter, burnedTokenToCopy) => {
         try{

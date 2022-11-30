@@ -19,7 +19,7 @@ export async function getGeneratedImage() {
     }
 
     try{
-        let output = await fetch('http://localhost:8501/v1/models/test-model:predict', options);
+        let output = await fetch('http://localhost:8501/v1/models/scaipes_generator:predict', options);
         output = await output.json();
         return output;
     }catch(e){
