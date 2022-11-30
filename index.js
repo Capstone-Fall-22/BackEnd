@@ -126,6 +126,7 @@ async function main() {
     }
 
     contract.on("mint", (tokenId, minter, burnedTokenToCopy) => {
+        console.log("Mint event detected");
         try{
             mintToken(tokenId, minter, burnedTokenToCopy);
         }catch(e){
@@ -135,6 +136,7 @@ async function main() {
     console.log("Listening for mint...");
 
     contract.on("burn", (tokenId, burner) => {
+        console.log("Burn event detected");
         try{
             burnToken(tokenId, burner);
         }catch(e){
