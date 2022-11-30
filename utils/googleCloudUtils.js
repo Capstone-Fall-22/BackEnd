@@ -2,8 +2,9 @@ import gcs from "@google-cloud/storage";
 import fs from "fs";
 
 export async function getMetadata(tokenID) {
+    let metadata;
     try{
-        const metadata = await fetch(`http://storage.googleapis.com/${bucketName}/${tokenID}.json`, {
+        metadata = await fetch(`http://storage.googleapis.com/${process.env.BUCKET_NAME}/${tokenID}.json`, {
             method: "GET",
             headers: { "content-type": "application/json" }
         });
@@ -37,9 +38,11 @@ export async function uploadMetadata(image_link, tokenId, burner = undefined) {
     
     try{
         const storage = new gcs.Storage({ keyFilename: process.env.GOOGLE_CLOUD_STORAGE_KEY });
-        const bucketName = process.env.BUCKET_NAME;
-        await storage.bucket(bucketName).upload(metadata_file, {
-            destination: `${tokenId}.json`
+        await storage.bucket(process.env.BUCKET_NAME).upload(metadata_file, {
+            destination: `${tokenId}.json`,
+            metadata: {
+                cacheControl: 'max-age=0, no-cache, no-store, must-revalidate'
+            }
         });
     }catch(e){
         console.error(e);
@@ -53,5 +56,5 @@ export async function uploadMetadata(image_link, tokenId, burner = undefined) {
         throw new Error("Error deleting metadata file");
     }
 
-    return `https://storage.googleapis.com/${bucketName}/${tokenId}.json`
+    return `https://storage.googleapis.com/${process.env.BUCKET_NAME}/${tokenId}.json`
 }
