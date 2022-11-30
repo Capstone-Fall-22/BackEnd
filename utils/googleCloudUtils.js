@@ -2,9 +2,8 @@ import gcs from "@google-cloud/storage";
 import fs from "fs";
 
 export async function getMetadata(tokenID) {
-    let metadata;
     try{
-        metadata = await fetch(`http://storage.googleapis.com/${process.env.BUCKET_NAME}/${tokenID}.json`, {
+        var metadata = await fetch(`http://storage.googleapis.com/${process.env.BUCKET_NAME}/${tokenID}.json`, {
             method: "GET",
             headers: { "content-type": "application/json" }
         });

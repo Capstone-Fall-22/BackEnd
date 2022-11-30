@@ -23,9 +23,8 @@ async function burnToken(tokenID, burner) {
 }
 
 async function mintBurnedToken(tokenId, minter, burnedTokenToCopy) {
-    let metadata;
     try{
-        metadata = await getMetadata(burnedTokenToCopy);
+        var metadata = await getMetadata(burnedTokenToCopy);
     }catch(e){
         // Metadata of burnedTokenToCopy could not be found
         console.error(e);
@@ -49,38 +48,36 @@ async function mintBurnedToken(tokenId, minter, burnedTokenToCopy) {
 }
 
 async function mintNewToken(tokenId){
-    let generatedImage, imagePath, imageBuffer, imageUrl, metadataUrl;
-
     try{
-        generatedImage = await getGeneratedImage();
+        var generatedImage = await getGeneratedImage();
     }catch(e){
         console.error(e);
         throw new Error(`Error getting generated image for tokenid #${tokenId}`);
     }
 
     try{
-        imagePath = await writeImage(generatedImage, tokenId);
+        var imagePath = await writeImage(generatedImage, tokenId);
     }catch(e){
         console.error(e);
         throw new Error(`Error writing image for tokenid #${tokenId}`);
     }
 
     try{
-        imageBuffer = await readImage(imagePath);
+        var imageBuffer = await readImage(imagePath);
     }catch(e){
         console.error(e);
         throw new Error(`Error reading image for tokenid #${tokenId}`);
     }
 
     try{
-        imageUrl = await uploadImage(imageBuffer);
+        var imageUrl = await uploadImage(imageBuffer);
     }catch(e){
         console.error(e);
         throw new Error(`Error uploading image for tokenid #${tokenId}`);
     }
 
     try{
-        metadataUrl = await uploadMetadata(imageUrl, tokenId);
+        var metadataUrl = await uploadMetadata(imageUrl, tokenId);
     }catch(e){
         console.error(e);
         throw new Error(`Error uploading metadata for tokenid #${tokenId}`);
@@ -112,21 +109,20 @@ async function mintToken(tokenId, minter, burnedTokenToCopy) {
 }
 
 async function main() {
-    let abi, provider, contract;
     try{
-        abi = await readABI(`${process.env.CONTRACT_ADDRESS}.json`);
+        var abi = await readABI(`${process.env.CONTRACT_ADDRESS}.json`);
     }catch(e){
         console.error("Error reading ABI");
     }
     
     try{
-        provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_API_KEY);
+        var provider = new ethers.providers.AlchemyProvider("goerli", process.env.ALCHEMY_API_KEY);
     }catch{
         console.error("Alchemy provider failed to connect");
     }
 
     try{
-        contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, abi, provider);
+        var contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, abi, provider);
     }catch(e){
         console.error("Error connecting to contract");
     }

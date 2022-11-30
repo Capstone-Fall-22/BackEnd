@@ -30,9 +30,8 @@ export async function writeImage(input, tokenID) {
 }
 
 export async function readImage(path) {
-    let image;
     try{
-        image = await fs.readFileSync(path);
+        var image = await fs.readFileSync(path);
     }catch(e){
         console.error(e);
         throw new Error("Error reading image");
