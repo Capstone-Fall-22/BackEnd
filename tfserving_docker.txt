@@ -1,0 +1,1 @@
+docker run -p 8501:8501   --mount type=bind,source=/home/chen/big_bertha/coding/capstone/scaipes-backend/scaipes_generator,target=/models/scaipes_generator   -e MODEL_NAME=scaipes_generator -t tensorflow/serving

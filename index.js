@@ -10,8 +10,6 @@ import { writeImage, readImage, readABI } from './utils/fileUtils.js';
 async function burnToken(tokenID, burner) {
     let metadata = await getMetadata(tokenID);
 
-    console.log(metadata);
-
     if (metadata.properties.burned === true) {
         throw new Error("NFT already burned");
     }
@@ -134,6 +132,7 @@ async function main() {
             console.error(`Error while minting: ${e}`);
         }
     });
+    console.log("Listening for mint...");
 
     contract.on("burn", (tokenId, burner) => {
         try{
@@ -142,6 +141,7 @@ async function main() {
             console.error(`Error while burning: ${e}`);
         }
     });
+    console.log("Listening for burn...");
 }
 
 main();
