@@ -1,6 +1,12 @@
 import Jimp from "jimp";
 import fs from "fs";
 
+/**
+ * Converts an image of the JSON object format to a PNG
+ * @param input a JSON object
+ * @param tokenID the token ID of the associated image
+ * @returns {Promise<string>} the promise that the image has been successfully written
+ */
 export async function writeImage(input, tokenID) {
     const path = `./temp/${tokenID}.png`;
     const height = input.predictions[0].length;
@@ -12,10 +18,12 @@ export async function writeImage(input, tokenID) {
         }
     }
 
+    // Creates an image buffer and sets the pixels
     let image = new Jimp(width, height);
     for (let i = 0; i < height; i++) {
         for (let j = 0; j < width; j++) {
             let pred = input.predictions[0][i][j];
+            // Algorithm to convert the RGB values into valid ones
             for (let k = 0; k < 3; k++) {
                 pred[k]++;
                 pred[k] *= 127.5;
@@ -25,11 +33,18 @@ export async function writeImage(input, tokenID) {
         }
     }
 
+    // Write image
     await image.writeAsync(path);
     return path;
 }
 
+/**
+ * Reads a PNG image and outputs it into a buffer
+ * @param path the path of the image
+ * @returns {Promise<*>} the promise that the image has been successfully been read
+ */
 export async function readImage(path) {
+    // Reads the image and places it into a buffer
     try{
         var image = await fs.readFileSync(path);
     }catch(e){
@@ -37,6 +52,7 @@ export async function readImage(path) {
         throw new Error("Error reading image");
     }
 
+    // The temporary image file is no longer needed and deleted
     try{
         fs.unlinkSync(path);
     }catch(e){
@@ -47,6 +63,11 @@ export async function readImage(path) {
     return image;
 }
 
+/**
+ * Reads the ABI of the Smart Contract
+ * @param path the path of the ABI
+ * @returns {Promise<*>} the promise that the ABI has been successfully read
+ */
 export async function readABI(path){
     const abi = JSON.parse(fs.readFileSync(path)).abi;
     return abi;
