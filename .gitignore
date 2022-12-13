@@ -4,8 +4,10 @@
 # Keys
 .env
 gcs/*
+keys
 
 # Temp
 /temp
 
-keys
+# Environment
+/.idea
